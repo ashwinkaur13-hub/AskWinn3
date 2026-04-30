@@ -1,54 +1,64 @@
-import { useEffect } from "react";
-import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import React from "react";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { Toaster } from "@/components/ui/sonner";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import Landing from "@/pages/Landing";
+import Login from "@/pages/Login";
+import AuthCallback from "@/pages/AuthCallback";
+import RoleSelect from "@/pages/RoleSelect";
+import Dashboard from "@/pages/Dashboard";
+import Directory from "@/pages/Directory";
+import AgentDetail from "@/pages/AgentDetail";
+import NewRFQ from "@/pages/NewRFQ";
+import RFQDetail from "@/pages/RFQDetail";
+import MyRFQs from "@/pages/MyRFQs";
+import AgentProfileEdit from "@/pages/AgentProfileEdit";
+import Messages from "@/pages/Messages";
+import AdminDashboard from "@/pages/AdminDashboard";
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
-
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
+const ProtectedRoute = ({ children, roles }) => {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-mono text-sm">Loading…</div>;
+  if (!user) return <Navigate to="/" replace />;
+  if (user.role === "unassigned") return <Navigate to="/select-role" replace />;
+  if (roles && !roles.includes(user.role)) return <Navigate to="/dashboard" replace />;
+  return children;
 };
 
-function App() {
+function AppRouter() {
+  const location = useLocation();
+  // Detect OAuth session_id in URL fragment BEFORE rendering routes
+  if (location.hash?.includes("session_id=")) {
+    return <AuthCallback />;
+  }
   return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </div>
+    <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/select-role" element={<RoleSelect />} />
+      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/directory" element={<Directory />} />
+      <Route path="/agents/:agentId" element={<AgentDetail />} />
+      <Route path="/rfqs/new" element={<ProtectedRoute roles={["buyer"]}><NewRFQ /></ProtectedRoute>} />
+      <Route path="/rfqs" element={<ProtectedRoute><MyRFQs /></ProtectedRoute>} />
+      <Route path="/rfqs/:rfqId" element={<ProtectedRoute><RFQDetail /></ProtectedRoute>} />
+      <Route path="/profile/edit" element={<ProtectedRoute roles={["agent"]}><AgentProfileEdit /></ProtectedRoute>} />
+      <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+      <Route path="/messages/:otherUserId" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute roles={["admin"]}><AdminDashboard /></ProtectedRoute>} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRouter />
+        <Toaster position="top-right" />
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}

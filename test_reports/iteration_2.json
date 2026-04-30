@@ -1,0 +1,37 @@
+{
+  "summary": "Tested iteration-2 NEW enhancements: (a) POST /api/auth/session accepts desired_role, (b) POST /api/rfqs/{id}/evaluate-bids, (c) /login page role cards, (d) Landing hero buyer/provider CTAs, (e) Navbar → /login, (f) RFQDetail Evaluate-Bids button + ranked results. 24/24 backend pytest green (7 new tests added for this iteration); all frontend flows verified end-to-end with playwright.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/rfqs/{id}/evaluate-bids (heuristic fallback)", "issue": "bid_evaluator._heuristic() does NOT attach agent details (company_name/price_usd/lead_time_days) to ranked items — only the LLM path does (see lines 167-173). When Gemini is rate-limited/unavailable and heuristic kicks in, the UI shows quote_id instead of supplier company name in rank tiles. Add the same agent-attachment block inside _heuristic."},
+      {"endpoint": "/api/rfqs/{id}/evaluate-bids (heuristic scoring)", "issue": "Heuristic may compute score > 100 (observed 102.0) before display cap; math in _heuristic: price_fit(0-100)*0.5 + verif(20) + rating*8 + lead*0.2 can exceed 100. Cap each component or normalise total to 0-100."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "RFQDetail bid-eval card (heuristic path)", "issues": ["Rank tiles render raw quote_id (e.g. 'q_ui_...A') when r.agent is null — root cause is backend heuristic not attaching agent (see minor backend issue). Consider defensive join on frontend too."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "In /app/backend/bid_evaluator.py _heuristic(), attach agent/price/lead_time to each ranked item (mirror the LLM-path block) and cap score at 100."
+  ],
+  "critical_code_review_comments": [
+    "bid_evaluator.py: PROVIDER/MODEL constants are read at import — env changes require backend restart. For an eval tool, this is fine but document it.",
+    "bid_evaluator.py: _parse() uses a greedy regex {[\\s\\S]*} that may grab too much if the LLM emits multiple JSON blocks or markdown; consider parsing JSON fence ```json``` first.",
+    "server.py evaluate_bids_endpoint: logic 'user.role == buyer and rfq.buyer_id != user.user_id → 403' is correct, but an admin is implicitly allowed — ensure that's desired product behaviour (agent=403 confirmed by test).",
+    "Login.jsx + Landing.jsx: startGoogle() / startLogin() duplicate the same 7 lines — extract to shared util in src/lib/auth.js.",
+    "AuthCallback.jsx: catch block is bare (catch {}) — surface error to user via toast so failed OAuth isn't silent.",
+    "Frontend: localStorage.sourcehq_desired_role is never read server-side; only used client-side to enrich /auth/session payload. No regression — confirmed end-to-end (Login cards + Landing hero both write to localStorage + redirect to auth.emergentagent.com with correct redirect_url)."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py", "/app/test_reports/iteration_2.json", "/app/test_reports/pytest/pytest_results.xml"],
+  "success_rate": {"backend": "100% (24/24)", "frontend": "100% (6/6 flows)"},
+  "test_credentials": "Sessions seeded via mongosh per /app/auth_testing.md. Cannot E2E the real Google OAuth without a live session_id — covered via 400/401 negative tests for POST /api/auth/session.",
+  "seed_data_creation": "Pytest fixtures seed TEST_ users/agents/RFQs/quotes with teardown. UI test seeded 1 buyer + 1 RFQ + 3 quotes + 3 agents (cleaned up after run).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend Gemini worked in pytest (observed 'LiteLLM completion() model=gemini/gemini-2.5-flash-lite' in backend logs). During UI test, heuristic fallback kicked in (likely session rate limit / cold cache) — still returns correct schema, so UI test passed. The heuristic fallback misses agent attachment (see minor issue). All 6 previous iteration-1 tests still pass unchanged. Navbar Sign-in correctly points to /login. Landing hero CTAs + Login role cards both write localStorage.sourcehq_desired_role and redirect to auth.emergentagent.com with redirect=<origin>/dashboard.",
+  "rca of the issue": "N/A — no blocking bug. Only minor backend polish items (heuristic agent-attachment & score cap) documented for main agent."
+}

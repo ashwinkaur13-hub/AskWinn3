@@ -1,0 +1,45 @@
+{
+  "summary": "Iteration-4 testing: category-specific RFQ requirement schemas + attachment uploads via Emergent object storage. Backend 45/45 pytests green (15 new + 30 regression). Frontend 3-step wizard works end-to-end for Beauty & Cosmetics (structured fields render, RFQ posts, PDF uploads via object storage, RFQDetail shows requirements + attachments). Hardware (no-schema) path renders a placeholder card instead of literally skipping step 2 — minor UX deviation from the review wording but functionally sound.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "DELETE /api/rfqs/{id}/attachments/{file_id}", "issue": "Only $pulls attachment metadata from the RFQ doc — does NOT delete the object from Emergent object storage. Orphaned blobs accumulate. storage.py has no delete_object() helper. Recommend adding delete_object(path) and calling it in delete_attachment endpoint."},
+      {"endpoint": "POST /api/rfqs/{id}/attachments", "issue": "When a non-owner buyer uploads, the handler calls file.read() (loading up to 20MB into memory) BEFORE the 403 check is fully enforced — actually 403 fires before read(). OK. But the 11-file limit check happens before reading; and the size check happens after reading. For DoS resilience consider checking Content-Length header pre-read."},
+      {"endpoint": "POST /api/rfqs/{id}/attachments", "issue": "Response returns attachment with 'storage_path' from object-storage service (result['path']). This leaks the internal storage path to the client; consider only returning file_id + filename + size + content_type to clients."},
+      {"endpoint": "GET /api/rfqs/categories/{category}/schema", "issue": "Returns 200 with empty schema {label:'',fields:[]} for unknown categories instead of 404. Per review this is intentional, but worth noting for frontend error-handling consistency."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "New RFQ wizard — Hardware (no-schema) category", "issue": "Review request says Hardware should 'skip structured fields and go straight to attachments step'. Current behavior still renders step 2 with a placeholder card reading 'No structured form for this category yet. Click submit to continue with the basics + attachments.' User must click Post RFQ from step 2 instead of landing directly on step 3. Not a blocker — no structured fields are rendered — but the step indicator shows 'STEP 2 OF 3' for a placeholder page.", "affected_selectors": ["rfq-form-step2", "rfq-category"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "(Optional) When schema is null (e.g., Hardware/Packaging/Toys/Food), auto-POST the RFQ in the useEffect that loads the schema OR have step 1's submit bypass step 2 entirely by setting step=3 directly and calling submitRfq programmatically. Current UX is serviceable but wizard says 'STEP 2 OF 3' for a near-empty page.",
+    "(Optional) Add storage.delete_object(path) and invoke it in DELETE /api/rfqs/{id}/attachments/{file_id} to prevent orphaned blobs in Emergent object storage.",
+    "(Optional) Stop returning raw storage_path to the client in upload response; return only file_id + filename."
+  ],
+  "critical_code_review_comments": [
+    "server.py line 423-446 upload_attachment: reads entire file into memory (await file.read()) before the size check. For 20MB ceiling this is tolerable, but if a malicious client sends 500MB the process still buffers it. Prefer streaming read + running size counter, or validate Content-Length header first.",
+    "storage.py: missing delete_object. DELETE /api/rfqs/{id}/attachments/{file_id} only removes the DB reference, leaving blobs orphaned in Emergent storage. Add a delete_object(path) helper that DELETEs /objects/{path}.",
+    "NewRFQ.jsx useEffect on form.category clears requirements on every category change (good) but also races the initial render — the fetch fires on mount before any user action; acceptable but the request to /api/rfqs/categories/<cat>/schema is public (no auth required). Confirm this is intentional.",
+    "NewRFQ.jsx step 2 placeholder path: when schema is null, the form is effectively decorative. Consider either auto-skipping to step 3 by POSTing the RFQ in the 'next' handler of step 1 for no-schema categories, or rephrase the header to 'STEP 2 OF 2' when no schema.",
+    "server.py get_category_schema: returns {label:'',fields:[]} rather than 404 for unknown categories — fine, but list_schemas exposes all schemas including full options lists (payload ~2-3KB). Acceptable.",
+    "rfq_schemas.py Beauty/Textile/Electronics are well-structured; no i18n layer — labels hardcoded in English. For future localization, consider keyed string tables."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (+15 new tests for schema GETs, requirements persistence, attachment upload/download/delete, 403/400 edge cases; total now 45)",
+    "/app/test_reports/iteration_4.json",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "success_rate": {"backend": "100% (45/45)", "frontend": "100% Beauty happy-path · 80% Hardware (placeholder instead of true step-skip)"},
+  "test_credentials": "Sessions seeded via pymongo per /app/auth_testing.md. Admin email admin@sourcehq.test (unchanged per prior iter note).",
+  "seed_data_creation": "Pytest fixtures create TEST_ buyer/agent/admin users + attachment RFQ; clean up on teardown. UI test seeded one buyer (uitok_*) and 2 RFQs (Beauty + Hardware) — cleaned up post-run.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest suite at /app/backend/tests/backend_test.py now has 45 tests (15 net-new in this iter under '# ===== Iteration 4 =====' marker). Iteration 4 new data-testids: rfq-form-step1/step2/step3, rfq-title, rfq-description, rfq-category, rfq-region, rfq-qty, rfq-budget, rfq-timeline, rfq-next-1, rfq-submit, req-<key> for each schema field (e.g., req-product_type, req-formulation), rfq-upload-zone, rfq-file-input, rfq-attachments-list, attachment-<file_id>, remove-<file_id>, rfq-finish; on RFQDetail: rfq-requirements, rfq-attachments, attachment-link-<file_id>. Object storage (Emergent objstore) works: upload returns 200 with file_id+storage_path, download returns PDF bytes with correct Content-Type and Content-Disposition. Download supports Bearer, cookie, AND ?auth=<token> query param — all tested. Hardware (no-schema) frontend still renders step 2 with placeholder — flag for E1 if review expected literal step skip.",
+  "rca of the issue": "N/A — no blocking bug. Main deviation: Hardware (no-schema) category renders a placeholder step 2 rather than auto-advancing to step 3. Likely by design (wizard step indicator stays at 3/3) but the review request wording implies a true skip. Fix if needed: in NewRFQ.jsx, when step 1 submit is clicked and schema is null, call submitRfq directly instead of setStep(2)."
+}

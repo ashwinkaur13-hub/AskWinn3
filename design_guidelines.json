@@ -1,0 +1,104 @@
+{
+  "theme": "light",
+  "archetype": "4 (Swiss & High-Contrast) with an Editorial/Magazine Twist",
+  "design_philosophy": "Bold, editorial, startup-first. High-end modern magazine meets trust-building sourcing tool. Emphasizes minimalism, wide white space, structural grayscale, and striking high-contrast accents.",
+  "colors": {
+    "background": "#F9F9F6",
+    "surface": "#FFFFFF",
+    "foreground": "#0A0A0A",
+    "primary": "#002FA7",
+    "primary_foreground": "#FFFFFF",
+    "secondary": "#EAEAEA",
+    "secondary_foreground": "#0A0A0A",
+    "accent": "#FF4500",
+    "accent_foreground": "#FFFFFF",
+    "muted": "#F3F3F0",
+    "muted_foreground": "#737370",
+    "border": "#E5E5E0",
+    "ring": "#002FA7"
+  },
+  "typography": {
+    "font_family": {
+      "heading": "Cormorant Garamond, serif",
+      "subheading": "Cabinet Grotesk, sans-serif",
+      "body": "Manrope, sans-serif",
+      "mono": "IBM Plex Mono, monospace"
+    },
+    "hierarchy": {
+      "h1": "text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter leading-none",
+      "h2": "text-3xl sm:text-4xl lg:text-5xl font-light tracking-tight leading-tight",
+      "h3": "text-xl sm:text-2xl font-medium tracking-tight font-subheading",
+      "h4": "text-lg sm:text-xl font-medium font-subheading",
+      "body": "text-base leading-relaxed text-foreground/80 font-body",
+      "body_small": "text-sm leading-relaxed text-foreground/70 font-body",
+      "overline": "text-xs font-bold uppercase tracking-[0.2em] text-primary font-mono"
+    }
+  },
+  "spacing_and_layout": {
+    "marketing_pages": {
+      "grid": "Tetris Grid (grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-8 lg:gap-12)",
+      "alignment": "Asymmetrical. Avoid strict center alignment for text. Use overlapping elements and negative space to guide the eye.",
+      "padding": "Generous (py-24 to py-32 for sections)"
+    },
+    "dashboards": {
+      "grid": "Control Room Grid (grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 or gap-6)",
+      "alignment": "Dense, structured, left-aligned. Every pixel utilized functionally.",
+      "padding": "Compact but breathable (p-6 for cards)"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-primary text-white rounded-none px-8 py-4 font-subheading uppercase tracking-widest text-sm hover:bg-primary/90 transition-colors",
+      "secondary": "border border-foreground bg-transparent text-foreground rounded-none px-8 py-4 font-subheading uppercase tracking-widest text-sm hover:bg-foreground hover:text-white transition-colors"
+    },
+    "cards": {
+      "base": "bg-surface border border-border rounded-none shadow-none transition-all duration-300",
+      "hover": "hover:-translate-y-1 hover:shadow-[8px_8px_0px_0px_rgba(10,10,10,1)] hover:border-foreground"
+    },
+    "inputs": {
+      "base": "border-b-2 border-border bg-transparent rounded-none px-0 py-3 focus:outline-none focus:border-primary focus:ring-0 transition-colors font-body text-base"
+    },
+    "glassmorphism": {
+      "header": "backdrop-blur-xl bg-background/70 border-b border-border/50"
+    }
+  },
+  "motion": {
+    "scroll": "lenis for smooth scrolling with momentum",
+    "micro_interactions": "Framer Motion for subtle stagger reveals on lists, 0.3s ease-out transitions for hover states",
+    "page_transitions": "Fade in and slight upward slide (y: 20 -> 0) on mount"
+  },
+  "media": {
+    "image_urls": {
+      "hero_texture": {
+        "url": "https://static.prod-images.emergentagent.com/jobs/cc07fdd8-74b2-4bb7-a874-33220127e764/images/9bb95dabd9ff5d0452db5805fbde0e07bd2d55b09c73129a50483f31a89641b0.png",
+        "description": "Macro photography of raw manufacturing materials, brushed steel and folded fabric, high end editorial lighting. Use as a large abstract background block or hero image side panel."
+      },
+      "abstract_supply_chain": {
+        "url": "https://static.prod-images.emergentagent.com/jobs/cc07fdd8-74b2-4bb7-a874-33220127e764/images/7c7a0768dddc8939296fa181c0046def32f71a13720a185229cb718cd268aca9.png",
+        "description": "Abstract geometric shapes representing supply chain and logistics. Use for AI matching features or empty states."
+      },
+      "factory_architecture": {
+        "url": "https://images.pexels.com/photos/34783124/pexels-photo-34783124.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Minimalist industrial building with a clear blue sky. Use for marketplace category headers or 'How it works' section."
+      },
+      "agent_portraits": [
+        "https://images.unsplash.com/photo-1769636929388-99eff95d3bf1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2ODh8MHwxfHNlYXJjaHwzfHxwcm9mZXNzaW9uYWwlMjBwb3J0cmFpdCUyMGhlYWRzaG90fGVufDB8fHx8MTc3Njg2MDgyNHww&ixlib=rb-4.1.0&q=85",
+        "https://images.unsplash.com/photo-1762522926157-bcc04bf0b10a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2ODh8MHwxfHNlYXJjaHwyfHxwcm9mZXNzaW9uYWwlMjBwb3J0cmFpdCUyMGhlYWRzaG90fGVufDB8fHx8MTc3Njg2MDgyNHww&ixlib=rb-4.1.0&q=85",
+        "https://images.pexels.com/photos/32721690/pexels-photo-32721690.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
+      ],
+      "startup_logos": [
+        "https://images.pexels.com/photos/6956342/pexels-photo-6956342.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
+      ]
+    }
+  },
+  "testing": {
+    "data_testid_guidelines": "ALL interactive elements (buttons, inputs, links, tabs, dialog triggers) MUST include a 'data-testid' attribute in kebab-case describing its role (e.g., 'buyer-login-button', 'rfq-submit-button', 'agent-search-input')."
+  },
+  "instructions_to_main_agent": [
+    "Build standard HTML/Tailwind for the landing page for maximum creative control over the asymmetrical grid. Avoid restrictive Shadcn structural wrappers here.",
+    "Use Shadcn UI for the Dashboards, Forms, Modals, and Tables, but override the default rounded corners to 'rounded-none' and remove soft shadows to maintain the brutalist editorial aesthetic.",
+    "Inject 'Cormorant Garamond' via Google Fonts for all H1/H2 tags to secure the high-end magazine feel, contrasting heavily against 'Manrope' for body text.",
+    "Implement the agent search and RFQ functionalities matching the role-based views (Buyer vs Agent).",
+    "Never use generic placeholder images. Map the provided 'image_urls' precisely to their intended components."
+  ]
+}
