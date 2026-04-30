@@ -32,8 +32,39 @@ Platform name: **AskWinn**.
 | 4 | 2026-04-30 | Guided RFQ wizard (Beauty/Textile/Electronics) + file uploads | 45/45 |
 | 5 | 2026-04-30 | Vendor workflow Phases 1-5 (KYC, metrics, anonymisation, status flow, score+badges); ISSUE overline removed | 59/59 |
 | 6 | 2026-04-30 | P0+P1 — Save Favourites, Public RFQ share link, Chat file attachments | 97/97 |
+| 7 | 2026-04-30 | **Buyer Funnel per AskWinn.xlsx** — Niches → Chat onboarding → Login gate → Sub-category → Business Blueprint → Multi-dim ratings → Cross-sell | 121/121 |
 
-### 2026-04-30 — Iteration 6: Save Favourites + Public RFQ + Chat attachments
+### 2026-04-30 — Iteration 7: Buyer Journey overhaul (AskWinn.xlsx)
+Implemented Phases 1–4, 6, 8 of the buyer journey from the spec sheet. Razorpay escrow (Phase 7), WhatsApp & SMS-OTP notifications remain deferred (no keys).
+- **Phase 1 — Niche selector** (`/start`): 8 niches (Jewellery, Apparel, Beauty, Home Decor, Electronics, Packaging, Food, Toys) with ₹ opportunity teasers and animated reveal cards
+- **Phase 2 — Chat onboarding** (`/start/chat`): conversational UI with 4 guided questions (product idea → business model → budget → timeline). After last answer, login gate fires "Sign in to unlock your Blueprint"; answers saved in sessionStorage and synced to user profile post-OAuth
+- **Phase 2.5 — Sub-category** (`/onboarding/sub-category`): 3–5 cards per niche; selection saved on user via `PUT /api/users/me/profile` (niche, sub_category, business_model, chat_answers)
+- **Phase 3 — Business Blueprint** (`/blueprint/:niche/:sub`): 7-section curated report (market size IN+global, biggest players, MOQ ranges, landed cost, gross margin, manufacturing hubs, key risks + bonus growth levers), data-driven from `BLUEPRINTS` dict + `DEFAULT_BLUEPRINT` fallback, stamped with `last_verified`
+- **Phase 4 — RFQ form** auto-prefills `category` from blueprint→agent_category (existing wizard flow unchanged)
+- **Phase 6 — Bid dashboard** (existing) — already shows quotes with vendor score & badges
+- **Phase 8 — Multi-dim ratings**: extended Review with `timeliness`, `quality`, `communication`, `value` (1–5 each); UI shows 4 mini-stars in addition to the overall rating
+- **Phase 8 — Cross-sell modal**: after a buyer posts a review, modal nudges "Need packaging too?" → CTA to `/start` (new RFQ) or directly browse another category
+
+### Backend additions
+- `/app/backend/blueprints.py` — NICHES, BLUEPRINTS, DEFAULT_BLUEPRINT, niche_for(), blueprint_for()
+- `GET /api/niches`, `GET /api/niches/{key}` (404 on unknown)
+- `GET /api/blueprints/{niche}/{sub_category}` — falls back to DEFAULT for unknown sub-categories
+- `PUT /api/users/me/profile` — saves niche/sub_category/business_model/chat_answers
+- `POST /api/agents/{id}/reviews` accepts the 4 dim fields (default 0)
+
+### Frontend additions
+- `pages/StartNiche.jsx`, `pages/StartChat.jsx`, `pages/SubCategorySelect.jsx`, `pages/Blueprint.jsx`
+- Landing hero CTA "I'm a buyer" now routes to `/start` (guided) instead of immediate Google login
+- AgentDetail review form: 4-dim sub-rating block + cross-sell modal post-submit
+
+### Stubbed (still pending external integrations)
+- Razorpay escrow (Phase 7 of buyer journey + Phase 1.4/4.12/4.14 of vendor) — needs key
+- WhatsApp notifications via Wati/Interakt (Phase 3.7, 3.10, 4.11 + buyer notifications) — banners only
+- SMS OTP (Twilio/MSG91) — kept Emergent Google OAuth instead (no user-visible OTP)
+- GST government API verification (Phase 1.3) — admin manual verify only
+- Resend email notifications — pending API key
+
+### Iteration 6 (recap) — Save Favourites + Public RFQ + Chat attachments
 - **P0 Save Favourites** (`favourites` collection): buyers bookmark agents
   - `POST /api/favourites/{agent_id}` — idempotent add (upsert + $setOnInsert)
   - `DELETE /api/favourites/{agent_id}` — remove
@@ -52,7 +83,7 @@ Platform name: **AskWinn**.
   - `GET /api/messages/{message_id}/attachment/{file_id}` — sender/recipient/admin only (403 otherwise); cookie/Bearer/`?auth=` auth modes
   - Frontend: Paperclip icon in composer, pending-attachments tray with remove, attachment cards in messages with download
 
-### Stubbed (pending external integrations)
+### Stubbed (pending external integrations — duplicate, kept for vendor history)
 - Razorpay onboarding fee (Phase 1.4) and escrow (Phase 4.12, 4.14) — needs key
 - WhatsApp notifications via Wati/Interakt (Phase 3.7, 3.10, 4.11) — banners only for now
 - GST government API verification (Phase 1.3) — admin manual verify only
@@ -63,12 +94,16 @@ Platform name: **AskWinn**.
 ### P0
 - ✅ ~~Buyer "save favourites" agent list~~ (iter 6)
 - ✅ ~~Public shareable RFQ link~~ (iter 6)
+- ✅ ~~Buyer guided funnel + Business Blueprint~~ (iter 7)
+- ✅ ~~Multi-dimensional vendor ratings~~ (iter 7)
+- ✅ ~~Cross-sell prompt post-rating~~ (iter 7)
 
 ### P1
 - ✅ ~~File attachments inside chat threads~~ (iter 6)
 - Resend email notifications (needs key)
-- Razorpay onboarding fee + escrow at sample order
-- WhatsApp notifications (Wati/Interakt)
+- Razorpay onboarding fee + escrow at sample order (Phase 7 buyer / Phase 4 vendor)
+- WhatsApp notifications (Wati/Interakt) — RFQ matched, bid received, sample status
+- Sample dispute flow (depends on escrow)
 - Structured forms for remaining categories
 
 ### P2
