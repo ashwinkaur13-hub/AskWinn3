@@ -1,17 +1,21 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Star, MapPin } from "lucide-react";
+import FavouriteButton from "@/components/FavouriteButton";
 
 export default function AgentCard({ agent, index = 0 }) {
   const delay = Math.min(index, 5) * 80;
   return (
     <Link
       to={`/agents/${agent.agent_id}`}
-      className="editorial-card p-6 block group"
+      className="editorial-card p-6 block group relative"
       style={{ animation: `reveal 0.6s ease-out ${delay}ms both` }}
       data-testid={`agent-card-${agent.agent_id}`}
     >
-      <div className="flex items-start justify-between mb-4">
+      <div className="absolute top-4 right-4 z-10">
+        <FavouriteButton agentId={agent.agent_id} />
+      </div>
+      <div className="flex items-start justify-between mb-4 pr-12">
         <div className="overline text-[10px]">{String(index + 1).padStart(2, "0")} /</div>
         {agent.verified && (
           <div className="tag verified flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />Verified</div>

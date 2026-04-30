@@ -4,7 +4,7 @@ import Navbar from "@/components/Navbar";
 import { useAuth, API } from "@/context/AuthContext";
 import axios from "axios";
 import { toast } from "sonner";
-import { Sparkles, MessageSquare, Gavel, Trophy, FileText, Download, Truck, X } from "lucide-react";
+import { Sparkles, MessageSquare, Gavel, Trophy, FileText, Download, Truck, X, Share2, Copy, Link2Off } from "lucide-react";
 import VendorBadges from "@/components/VendorBadges";
 
 export default function RFQDetail() {
@@ -20,9 +20,14 @@ export default function RFQDetail() {
   const [passing, setPassing] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState("");
   const [trackingUrl, setTrackingUrl] = useState("");
+  const [shareToken, setShareToken] = useState(null);
+  const [shareBusy, setShareBusy] = useState(false);
   const [quote, setQuote] = useState({ price_usd: "", lead_time_days: "", message: "", contact_number: "", sample_available: false, sample_cost_usd: 0 });
 
-  const load = () => axios.get(`${API}/rfqs/${rfqId}`).then((r) => setData(r.data));
+  const load = () => axios.get(`${API}/rfqs/${rfqId}`).then((r) => {
+    setData(r.data);
+    setShareToken(r.data?.rfq?.share_token || null);
+  });
   useEffect(() => { load(); }, [rfqId]);
 
   if (!data) return <div className="min-h-screen bg-bone"><Navbar /><div className="p-20 text-center font-mono">Loading…</div></div>;
@@ -38,6 +43,46 @@ export default function RFQDetail() {
     } catch (err) {
       toast.error("Failed");
     } finally { setPassing(false); }
+  };
+
+  const generateShare = async () => {
+    setShareBusy(true);
+    try {
+      const r = await axios.post(`${API}/rfqs/${rfqId}/share`);
+      setShareToken(r.data.share_token);
+      const url = `${window.location.origin}/p/rfq/${r.data.share_token}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success("Public link copied to clipboard");
+      } catch {
+        toast.success("Public link generated");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed");
+    } finally { setShareBusy(false); }
+  };
+
+  const copyShare = async () => {
+    if (!shareToken) return;
+    const url = `${window.location.origin}/p/rfq/${shareToken}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied");
+    } catch {
+      toast.error("Could not copy");
+    }
+  };
+
+  const revokeShare = async () => {
+    if (!window.confirm("Revoke the public link? Anyone with the URL will lose access.")) return;
+    setShareBusy(true);
+    try {
+      await axios.delete(`${API}/rfqs/${rfqId}/share`);
+      setShareToken(null);
+      toast.success("Public link revoked");
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed");
+    } finally { setShareBusy(false); }
   };
 
   const updateStatus = async (quoteId, nextStatus, tracking = "") => {
@@ -120,6 +165,48 @@ export default function RFQDetail() {
             <button onClick={passRfq} disabled={passing} className="btn-outline text-xs" data-testid="pass-rfq-btn">
               <X className="w-3 h-3" /> Pass on this RFQ
             </button>
+          </div>
+        )}
+
+        {isBuyer && (
+          <div className="editorial-card p-6 mb-8" data-testid="rfq-share-panel">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-start gap-4">
+                <Share2 className="w-5 h-5 text-klein mt-1" />
+                <div>
+                  <div className="overline mb-1">§ PUBLIC LINK</div>
+                  <div className="font-serif text-2xl tracking-tight leading-tight">
+                    {shareToken ? "Share this RFQ anywhere" : "Generate a shareable link"}
+                  </div>
+                  <p className="text-sm text-[--muted-foreground] mt-1 max-w-md">
+                    {shareToken
+                      ? "A read-only public link. Buyer identity, attachments, and bidder info stay hidden."
+                      : "Post on LinkedIn, WhatsApp, email — anyone can read the brief without signing in."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {shareToken ? (
+                  <>
+                    <button onClick={copyShare} className="btn-primary text-xs" data-testid="copy-share-link">
+                      <Copy className="w-3 h-3" /> Copy link
+                    </button>
+                    <button onClick={revokeShare} disabled={shareBusy} className="btn-outline text-xs" data-testid="revoke-share-link">
+                      <Link2Off className="w-3 h-3" /> Revoke
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={generateShare} disabled={shareBusy} className="btn-primary text-xs" data-testid="generate-share-link">
+                    <Share2 className="w-3 h-3" /> {shareBusy ? "Generating…" : "Generate link"}
+                  </button>
+                )}
+              </div>
+            </div>
+            {shareToken && (
+              <div className="mt-4 pt-4 border-t border-[--border-soft] font-mono text-xs text-[--muted-foreground] break-all" data-testid="share-link-text">
+                {`${window.location.origin}/p/rfq/${shareToken}`}
+              </div>
+            )}
           </div>
         )}
 

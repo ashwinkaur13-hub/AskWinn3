@@ -6,6 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 import uuid
+import secrets
 import httpx
 from pathlib import Path
 from pydantic import BaseModel, Field
@@ -168,12 +169,14 @@ class Message(BaseModel):
     sender_id: str
     recipient_id: str
     body: str
+    attachments: List[dict] = []
     created_at: datetime
 
 
 class MessageInput(BaseModel):
     recipient_id: str
-    body: str
+    body: str = ""
+    attachments: List[dict] = []
 
 
 class Review(BaseModel):
@@ -813,6 +816,8 @@ def thread_key(a: str, b: str) -> str:
 
 @api.post("/messages")
 async def send_message(inp: MessageInput, user: dict = Depends(get_current_user)):
+    if not inp.body.strip() and not inp.attachments:
+        raise HTTPException(400, "Message body or attachment required")
     tid = thread_key(user["user_id"], inp.recipient_id)
     doc = {
         "message_id": f"m_{uuid.uuid4().hex[:12]}",
@@ -820,6 +825,7 @@ async def send_message(inp: MessageInput, user: dict = Depends(get_current_user)
         "sender_id": user["user_id"],
         "recipient_id": inp.recipient_id,
         "body": inp.body,
+        "attachments": inp.attachments or [],
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.messages.insert_one(doc)
@@ -847,6 +853,176 @@ async def list_threads(user: dict = Depends(get_current_user)):
             other = await db.users.find_one({"user_id": other_id}, {"_id": 0})
             seen[other_id] = {"other": other, "last": m}
     return list(seen.values())
+
+
+# ---------- Favourites ----------
+@api.post("/favourites/{agent_id}")
+async def add_favourite(agent_id: str, user: dict = Depends(get_current_user)):
+    await require_role(user, "buyer")
+    agent = await db.agent_profiles.find_one({"agent_id": agent_id}, {"_id": 0})
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+    await db.favourites.update_one(
+        {"user_id": user["user_id"], "agent_id": agent_id},
+        {"$setOnInsert": {
+            "user_id": user["user_id"],
+            "agent_id": agent_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+    return {"ok": True, "favourited": True}
+
+
+@api.delete("/favourites/{agent_id}")
+async def remove_favourite(agent_id: str, user: dict = Depends(get_current_user)):
+    await require_role(user, "buyer")
+    await db.favourites.delete_one({"user_id": user["user_id"], "agent_id": agent_id})
+    return {"ok": True, "favourited": False}
+
+
+@api.get("/favourites")
+async def list_favourites(user: dict = Depends(get_current_user)):
+    await require_role(user, "buyer")
+    favs = await db.favourites.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    agent_ids = [f["agent_id"] for f in favs]
+    agents = await db.agent_profiles.find({"agent_id": {"$in": agent_ids}}, {"_id": 0}).to_list(500)
+    by_id = {a["agent_id"]: a for a in agents}
+    return [
+        {"favourited_at": f["created_at"], "agent": by_id[f["agent_id"]]}
+        for f in favs if f["agent_id"] in by_id
+    ]
+
+
+@api.get("/favourites/ids")
+async def favourite_ids(user: dict = Depends(get_current_user)):
+    await require_role(user, "buyer")
+    favs = await db.favourites.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(2000)
+    return {"agent_ids": [f["agent_id"] for f in favs]}
+
+
+# ---------- Public RFQ share ----------
+@api.post("/rfqs/{rfq_id}/share")
+async def create_share_link(rfq_id: str, user: dict = Depends(get_current_user)):
+    if user["role"] not in ("buyer", "admin"):
+        raise HTTPException(403, "Buyers only")
+    rfq = await db.rfqs.find_one({"rfq_id": rfq_id}, {"_id": 0})
+    if not rfq:
+        raise HTTPException(404, "RFQ not found")
+    if user["role"] == "buyer" and rfq["buyer_id"] != user["user_id"]:
+        raise HTTPException(403, "Not your RFQ")
+    token = rfq.get("share_token") or secrets.token_urlsafe(16)
+    if not rfq.get("share_token"):
+        await db.rfqs.update_one({"rfq_id": rfq_id}, {"$set": {"share_token": token}})
+    return {"share_token": token, "share_path": f"/p/rfq/{token}"}
+
+
+@api.delete("/rfqs/{rfq_id}/share")
+async def revoke_share_link(rfq_id: str, user: dict = Depends(get_current_user)):
+    if user["role"] not in ("buyer", "admin"):
+        raise HTTPException(403, "Buyers only")
+    rfq = await db.rfqs.find_one({"rfq_id": rfq_id}, {"_id": 0})
+    if not rfq:
+        raise HTTPException(404, "RFQ not found")
+    if user["role"] == "buyer" and rfq["buyer_id"] != user["user_id"]:
+        raise HTTPException(403, "Not your RFQ")
+    await db.rfqs.update_one({"rfq_id": rfq_id}, {"$unset": {"share_token": ""}})
+    return {"ok": True}
+
+
+@api.get("/public/rfqs/{share_token}")
+async def public_rfq(share_token: str):
+    rfq = await db.rfqs.find_one({"share_token": share_token}, {"_id": 0})
+    if not rfq:
+        raise HTTPException(404, "Link is invalid or has been revoked")
+    quote_count = await db.quotes.count_documents({"rfq_id": rfq["rfq_id"]})
+    return {
+        "rfq_id": rfq["rfq_id"],
+        "title": rfq["title"],
+        "description": rfq["description"],
+        "category": rfq["category"],
+        "target_region": rfq.get("target_region", "Any"),
+        "quantity": rfq["quantity"],
+        "budget_usd": rfq["budget_usd"],
+        "timeline": rfq["timeline"],
+        "status": rfq["status"],
+        "requirements": rfq.get("requirements", {}),
+        "attachment_count": len(rfq.get("attachments") or []),
+        "quote_count": quote_count,
+        "created_at": rfq.get("created_at"),
+    }
+
+
+# ---------- Message attachments ----------
+@api.post("/messages/attachment")
+async def upload_message_attachment(
+    recipient_id: str = Query(...),
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user),
+):
+    other = await db.users.find_one({"user_id": recipient_id}, {"_id": 0})
+    if not other:
+        raise HTTPException(404, "Recipient not found")
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower()
+    if ext not in ALLOWED_EXTS:
+        raise HTTPException(400, f"Unsupported file type .{ext}")
+    data = await file.read()
+    if len(data) > MAX_FILE_SIZE:
+        raise HTTPException(400, "File too large (>20MB)")
+    file_id = uuid.uuid4().hex
+    tid = thread_key(user["user_id"], recipient_id)
+    storage_path = f"{APP_NAME}/messages/{tid}/{file_id}.{ext}"
+    content_type = MIME_TYPES.get(ext, file.content_type or "application/octet-stream")
+    try:
+        result = put_object(storage_path, data, content_type)
+    except Exception as e:
+        logging.exception("Message attachment upload failed")
+        raise HTTPException(500, f"Upload failed: {e}")
+    return {
+        "file_id": file_id,
+        "storage_path": result["path"],
+        "filename": file.filename,
+        "content_type": content_type,
+        "size": result.get("size", len(data)),
+    }
+
+
+@api.get("/messages/{message_id}/attachment/{file_id}")
+async def download_message_attachment(
+    message_id: str, file_id: str,
+    request: Request,
+    auth: Optional[str] = Query(None),
+):
+    token = request.cookies.get("session_token") or auth
+    if not token:
+        h = request.headers.get("Authorization", "")
+        if h.startswith("Bearer "):
+            token = h[7:]
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if not session:
+        raise HTTPException(401, "Invalid session")
+    user_id = session["user_id"]
+    msg = await db.messages.find_one({"message_id": message_id}, {"_id": 0})
+    if not msg:
+        raise HTTPException(404, "Message not found")
+    if user_id not in (msg["sender_id"], msg["recipient_id"]):
+        u = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        if not u or u.get("role") != "admin":
+            raise HTTPException(403, "Not allowed")
+    att = next((a for a in (msg.get("attachments") or []) if a["file_id"] == file_id), None)
+    if not att:
+        raise HTTPException(404, "Attachment not found")
+    try:
+        data, ct = get_object(att["storage_path"])
+    except Exception as e:
+        raise HTTPException(500, f"Download failed: {e}")
+    return Response(
+        content=data,
+        media_type=att.get("content_type", ct),
+        headers={"Content-Disposition": f'inline; filename="{att.get("filename","file")}"'},
+    )
 
 
 # ---------- Reviews ----------

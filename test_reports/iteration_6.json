@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration-6 backend testing — Save Favourites + Public RFQ Share + Chat File Attachments. Wrote 38 new pytest cases in /app/backend/tests/test_iter6_favourites_share_attachments.py covering all P0/P1 endpoints (favourites CRUD + role gates + idempotency, RFQ share token create/idempotent/revoke + sanitised public read + 404 on revoked/invalid, message attachment upload PDF + ext + size + recipient validation, send-message body/attachment composability, attachment download by sender/recipient/admin + 403 for non-participant + 401 unauth + 404 unknown + query-token auth) plus regression spot-checks. Result: 38/38 new + 59/59 prior = 97/97 green. No backend issues found. Real Emergent Object Storage upload/download verified end-to-end (PDF round-trip preserves %PDF magic). All seed data prefixed TEST_iter6/iter6- and cleaned up via fixture teardown.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/rfqs/{rfq_id}/share", "issue": "Auth gate uses inline check `user['role'] not in ('buyer','admin')` returning 403; the rest of the codebase uses the shared require_role(...) helper. Cosmetic — same outcome."},
+      {"endpoint": "GET /api/messages/{message_id}/attachment/{file_id}", "issue": "Auth resolution duplicates get_current_user logic inline (cookie → ?auth → Bearer). Refactor into a reusable resolver — same pattern is duplicated in /api/rfqs/{rfq_id}/attachments/{file_id} download endpoint."},
+      {"endpoint": "POST /api/messages/attachment", "issue": "No per-thread attachment count cap. Buyer can spam-upload large files into storage. RFQ attachments enforce a 10-file ceiling — chat path does not. Consider rate-limit or message-level cap."},
+      {"endpoint": "GET /api/public/rfqs/{share_token}", "issue": "No throttling / token rotation. Tokens are 16-byte URL-safe (good entropy) but stay valid forever until DELETE share. Consider optional expiry on share tokens for sensitive RFQs."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter6_favourites_share_attachments.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iter6_results.xml",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Low) Extract attachment download auth resolver into a shared helper used by both /api/rfqs/.../attachments/{file_id} and /api/messages/{id}/attachment/{file_id}.",
+    "(Low) Add per-thread (or per-message) attachment-count / size cap on /api/messages/attachment to mirror the 10-file ceiling on RFQ attachments.",
+    "(Low) Consider optional expiry/TTL on RFQ share tokens (currently revoke-only).",
+    "(P1 deferred) Wire P1 keyed integrations (Resend email for new-quote / new-message notifications, Razorpay for sample-payment, WhatsApp Business notifications) — out of scope for this iteration per user."
+  ],
+  "critical_code_review_comments": [
+    "server.py 905-930 — POST/DELETE /rfqs/{rfq_id}/share inline-checks role instead of calling require_role; harmless but inconsistent with repo style.",
+    "server.py 990-1025 — download_message_attachment duplicates the bearer/cookie/?auth resolution logic of get_current_user. Both this and /rfqs attachment download should share a `resolve_user_from_request_or_query(request, auth)` helper.",
+    "server.py 858-895 — favourites endpoints all call require_role(user, 'buyer'), correctly excluding admin from buyer-scoped UI flows. If admin-as-buyer support is ever desired, broaden role list.",
+    "server.py 933-953 — public_rfq strips buyer_id and contact info; attachment_count returned but storage_path/file_id NOT returned, so public viewers can't download files. This is a deliberate sanitisation choice — confirm with PM whether public viewers should optionally get download access. Currently NO leak; behaviour correct.",
+    "server.py 957-987 — upload_message_attachment reads full file into memory before checking size (data = await file.read(); then size check). For 20 MB cap on a low-RAM host this is acceptable but a streaming chunk-count guard would be safer at scale.",
+    "server.py 819 — `if not inp.body.strip() and not inp.attachments` correctly enforces 'either body or attachment'. Good edge handling."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter6_favourites_share_attachments.py (NEW — 38 tests)",
+    "/app/test_reports/iteration_6.json (NEW)",
+    "/app/test_reports/pytest/iter6_results.xml (NEW)",
+    "/app/test_reports/pytest/pytest_results.xml (regenerated — 59 prior tests still green)"
+  ],
+  "success_rate": {"backend": "100% (97/97 — 38 new iter-6 + 59 regression)", "frontend": "skipped per request"},
+  "test_credentials": "Sessions seeded directly in Mongo per /app/auth_testing.md. Buyer/agent/admin tokens created in fixtures and torn down. Admin email = admin@sourcehq.test. /app/memory/test_credentials.md is empty (placeholder only) — flagged but not blocking; tests do not depend on it.",
+  "seed_data_creation": "Per-module fixtures: 2 buyers (TEST_iter6_buyer_*), 2 agents (TEST_iter6_agent_*) with agent_profiles, 1 admin session, 1 RFQ (TEST_Iter6 RFQ), 1 transient quote-flow RFQ + quote, 1 PDF attachment uploaded to real Emergent Object Storage, 2 messages, 1 favourite (added then removed). All teardown via fixture finalizers (db.X.delete_*).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration-6 added 38 tests in /app/backend/tests/test_iter6_favourites_share_attachments.py organised in 4 classes: TestFavourites (8), TestRfqShare (9), TestMessageAttachments (15), TestRegression (6). Run with `pytest backend/tests/test_iter6_*.py -v`. Existing regression suite (/app/backend/tests/backend_test.py, 59 tests) still 100% green. Total backend coverage now 97 tests. Real services hit: Emergent Object Storage (upload + download round-trip on PDF), Mongo (favourites, rfqs.share_token, messages.attachments). Pytest module-level state via `pytest.iter6_*` attributes (share_token, attachment, message_id) — keep test order stable. P1 keyed integrations (Resend, Razorpay, WhatsApp) deferred per user; not implemented and not tested.",
+  "rca of the issue": "No bugs to RCA — all new endpoints behave per spec. Notable validations confirmed: (1) Favourites idempotent via $setOnInsert upsert (verified single doc after duplicate POST). (2) Public RFQ payload contains NO buyer_id, buyer_name, or attachment storage_paths — only id/title/desc/category/region/qty/budget/timeline/status/requirements/attachment_count/quote_count/created_at. (3) Share token is 16-byte secrets.token_urlsafe — strong entropy, no PII. (4) Message attachment upload validates extension before reading (security: rejects .exe before storage call), then enforces 20 MB cap, then writes to storage path `askwinn/messages/{thread_id}/{file_id}.{ext}`. (5) Download permission: sender OR recipient OR admin — non-participant buyer correctly 403'd. (6) Attachment-only message (empty body) accepted; truly empty (no body, no attachments) correctly 400'd."
+}

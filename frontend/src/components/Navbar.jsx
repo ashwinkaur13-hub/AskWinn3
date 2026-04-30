@@ -18,6 +18,7 @@ export default function Navbar({ transparent = false }) {
         </Link>
         <nav className="hidden md:flex items-center gap-10 text-[13px] font-medium">
           <Link to="/directory" className="hover:text-klein transition-colors" data-testid="nav-directory">Agents</Link>
+          {user?.role === "buyer" && <Link to="/favourites" className="hover:text-klein transition-colors" data-testid="nav-favourites">Saved</Link>}
           {user && <Link to="/rfqs" className="hover:text-klein transition-colors" data-testid="nav-rfqs">RFQs</Link>}
           {user && <Link to="/messages" className="hover:text-klein transition-colors" data-testid="nav-messages">Messages</Link>}
           {user?.role === "admin" && <Link to="/admin" className="hover:text-klein transition-colors flex items-center gap-1" data-testid="nav-admin"><Shield className="w-3.5 h-3.5" />Admin</Link>}

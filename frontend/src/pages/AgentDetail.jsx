@@ -7,6 +7,7 @@ import { useAuth, API } from "@/context/AuthContext";
 import { CheckCircle2, MapPin, Star, MessageSquare, Award, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import VendorBadges from "@/components/VendorBadges";
+import FavouriteButton from "@/components/FavouriteButton";
 
 export default function AgentDetail() {
   const { agentId } = useParams();
@@ -81,9 +82,12 @@ export default function AgentDetail() {
               <div className="font-mono text-xs text-[--muted-foreground] mb-6 flex items-center gap-2"><Building2 className="w-3 h-3" /> FACTORY · {[agent.factory_city, agent.factory_state].filter(Boolean).join(", ").toUpperCase()}</div>
             )}
             {user && user.user_id !== agent.user_id && (
-              <button onClick={startChat} className="btn-primary" data-testid="agent-chat-btn">
-                <MessageSquare className="w-4 h-4" /> Start a conversation
-              </button>
+              <div className="flex items-center gap-3 flex-wrap">
+                <button onClick={startChat} className="btn-primary" data-testid="agent-chat-btn">
+                  <MessageSquare className="w-4 h-4" /> Start a conversation
+                </button>
+                <FavouriteButton agentId={agent.agent_id} size="lg" />
+              </div>
             )}
           </div>
           <div className="lg:col-span-4">

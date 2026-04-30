@@ -16,6 +16,8 @@ import MyRFQs from "@/pages/MyRFQs";
 import AgentProfileEdit from "@/pages/AgentProfileEdit";
 import Messages from "@/pages/Messages";
 import AdminDashboard from "@/pages/AdminDashboard";
+import Favourites from "@/pages/Favourites";
+import PublicRFQ from "@/pages/PublicRFQ";
 
 const ProtectedRoute = ({ children, roles }) => {
   const { user, loading } = useAuth();
@@ -47,6 +49,8 @@ function AppRouter() {
       <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
       <Route path="/messages/:otherUserId" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute roles={["admin"]}><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/favourites" element={<ProtectedRoute roles={["buyer"]}><Favourites /></ProtectedRoute>} />
+      <Route path="/p/rfq/:token" element={<PublicRFQ />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
