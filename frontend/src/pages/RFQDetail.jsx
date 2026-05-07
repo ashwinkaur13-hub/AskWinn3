@@ -123,10 +123,12 @@ export default function RFQDetail() {
         price_usd: Number(quote.price_usd),
         lead_time_days: Number(quote.lead_time_days),
         message: quote.message,
-        contact_number: quote.contact_number,
+        contact_number: "",
+        sample_available: !!quote.sample_available,
+        sample_cost_usd: Number(quote.sample_cost_usd) || 0,
       });
       toast.success("Quote submitted");
-      setQuote({ price_usd: "", lead_time_days: "", message: "", contact_number: "" });
+      setQuote({ price_usd: "", lead_time_days: "", message: "", contact_number: "", sample_available: false, sample_cost_usd: 0 });
       load();
     } catch (err) {
       toast.error(err.response?.data?.detail || "Failed");
@@ -212,7 +214,7 @@ export default function RFQDetail() {
 
         <div className="grid md:grid-cols-3 gap-6 mb-12">
           <Stat l="Quantity" v={rfq.quantity} />
-          <Stat l="Budget" v={`$${rfq.budget_usd}`} />
+          <Stat l="Budget" v={`₹${Number(rfq.budget_usd).toLocaleString()}`} />
           <Stat l="Timeline" v={rfq.timeline} />
         </div>
 
@@ -350,12 +352,13 @@ export default function RFQDetail() {
                 <div key={q.quote_id} className={`editorial-card p-6 ${isWinner ? "border-l-4 border-l-klein bg-klein/5" : notSelected ? "opacity-60" : ""}`} data-testid={`quote-${q.quote_id}`}>
                   <div className="flex justify-between items-baseline flex-wrap gap-3 mb-3">
                     <div className="flex items-center gap-2 flex-wrap">
-                      {q.agent?.company_name === "Anonymous bidder" ? (
-                        <span className="font-serif text-2xl leading-tight italic text-[--muted-foreground]">Anonymous bidder</span>
+                      {q.agent?.company_name === "Anonymous bidder" || (q.agent_user_id === "hidden") ? (
+                        <span className="font-serif text-2xl leading-tight italic text-[--muted-foreground]" data-testid={`anon-vendor-${q.quote_id}`}>{q.agent?.company_name || "Anonymous bidder"}</span>
                       ) : (
-                        <Link to={`/agents/${q.agent_id}`} className="font-serif text-2xl leading-tight">{q.agent?.company_name || "Agent"}</Link>
+                        <Link to={`/agents/${q.agent_id}`} className="font-serif text-2xl leading-tight">{q.agent?.company_name || "Manufacturer"}</Link>
                       )}
                       <VendorBadges badges={q.agent?.badges || []} />
+                      {q.agent?.verified && q.agent_user_id === "hidden" && <span className="tag verified">VERIFIED</span>}
                       {isWinner && <span className="tag verified flex items-center gap-1"><Trophy className="w-3 h-3" />WINNER</span>}
                       {notSelected && <span className="tag">NOT SELECTED</span>}
                       {mine && isWinner && <span className="tag accent">YOU WON 🏆</span>}
@@ -363,13 +366,10 @@ export default function RFQDetail() {
                     <div className="font-mono text-xs text-[--muted-foreground]">{new Date(q.created_at).toLocaleDateString()}</div>
                   </div>
                   <div className="flex gap-6 mb-4 flex-wrap">
-                    <div><div className="overline">Price</div><div className="font-serif text-2xl">${q.price_usd}</div></div>
+                    <div><div className="overline">Price / unit</div><div className="font-serif text-2xl">₹{q.price_usd}</div></div>
                     <div><div className="overline">Lead time</div><div className="font-serif text-2xl">{q.lead_time_days}d</div></div>
                     {q.sample_available && (
-                      <div><div className="overline">Sample</div><div className="font-serif text-2xl">${q.sample_cost_usd || 0}</div></div>
-                    )}
-                    {q.contact_number && (
-                      <div><div className="overline">Contact</div><div className="font-serif text-2xl">{q.contact_number}</div></div>
+                      <div><div className="overline">Sample</div><div className="font-serif text-2xl">₹{q.sample_cost_usd || 0}</div></div>
                     )}
                   </div>
                   {q.message && <p className="text-sm whitespace-pre-wrap mb-4">{q.message}</p>}
@@ -434,16 +434,12 @@ export default function RFQDetail() {
             <div className="overline mb-4">SUBMIT A QUOTE</div>
             <div className="grid md:grid-cols-2 gap-6 mb-6">
               <div>
-                <div className="overline mb-1">Price (USD)</div>
+                <div className="overline mb-1">Price per unit (₹)</div>
                 <input type="number" required className="input-underline" value={quote.price_usd} onChange={(e) => setQuote({ ...quote, price_usd: e.target.value })} data-testid="quote-price" />
               </div>
               <div>
                 <div className="overline mb-1">Lead time (days)</div>
                 <input type="number" required className="input-underline" value={quote.lead_time_days} onChange={(e) => setQuote({ ...quote, lead_time_days: e.target.value })} data-testid="quote-lead" />
-              </div>
-              <div className="md:col-span-2">
-                <div className="overline mb-1">Contact number (WhatsApp / phone) — optional</div>
-                <input type="tel" className="input-underline" value={quote.contact_number} onChange={(e) => setQuote({ ...quote, contact_number: e.target.value })} placeholder="+1 555 123 4567" data-testid="quote-contact" />
               </div>
               <div className="md:col-span-2 grid grid-cols-2 gap-6">
                 <label className="flex items-center gap-3 cursor-pointer pt-6">
@@ -452,15 +448,18 @@ export default function RFQDetail() {
                 </label>
                 {quote.sample_available && (
                   <div>
-                    <div className="overline mb-1">Sample cost (USD)</div>
+                    <div className="overline mb-1">Sample cost (₹)</div>
                     <input type="number" min="0" className="input-underline" value={quote.sample_cost_usd} onChange={(e) => setQuote({ ...quote, sample_cost_usd: e.target.value })} data-testid="quote-sample-cost" />
                   </div>
                 )}
               </div>
             </div>
             <div className="mb-6">
-              <div className="overline mb-1">Message</div>
-              <textarea required className="input-underline min-h-[100px]" value={quote.message} onChange={(e) => setQuote({ ...quote, message: e.target.value })} data-testid="quote-message" placeholder="Approach, capabilities, why you're a fit…" />
+              <div className="overline mb-1">Approach / pitch</div>
+              <textarea required className="input-underline min-h-[100px]" value={quote.message} onChange={(e) => setQuote({ ...quote, message: e.target.value })} data-testid="quote-message" placeholder="Raw materials, MOQ-fit, capacity, why you're a fit…" />
+            </div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[--muted-foreground] mb-3 leading-relaxed" data-testid="commission-microcopy">
+              By submitting this quote, you agree to AskWinn's standard success fee if the buyer accepts and initiates production. Payment is held in escrow and released to you on delivery confirmation.
             </div>
             <button type="submit" className="btn-primary" data-testid="quote-submit">Submit quote</button>
           </form>

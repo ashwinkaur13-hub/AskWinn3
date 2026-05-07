@@ -73,6 +73,7 @@ class AgentProfile(BaseModel):
     factory_video_url: str = ""
     catalogue_url: str = ""
     availability_status: Literal["active", "paused"] = "active"
+    turnkey_manufacturing: bool = False
     # Phase 5 Score & Badges
     vendor_score: float = 0.0
     badges: List[str] = []
@@ -100,6 +101,7 @@ class AgentProfileInput(BaseModel):
     factory_video_url: str = ""
     catalogue_url: str = ""
     availability_status: Literal["active", "paused"] = "active"
+    turnkey_manufacturing: bool = False
 
 
 class RFQ(BaseModel):
@@ -207,6 +209,7 @@ class BuyerProfileInput(BaseModel):
     niche: str = ""
     sub_category: str = ""
     business_model: str = ""
+    phone: str = ""
     chat_answers: dict[str, Any] = {}
 
 
@@ -443,7 +446,8 @@ async def get_rfq(rfq_id: str, user: dict = Depends(get_current_user)):
     is_buyer_owner = user["role"] == "buyer" and rfq["buyer_id"] == user["user_id"]
     is_admin = user["role"] == "admin"
     is_winner = False
-    # Phase 3: Anonymise buyer + competing bidders for agents (until they win)
+    # Phase 3 / spec sheet: Anonymise vendor identity for buyers until they accept a winner.
+    # Only the winning quote (post-accept) reveals identity.
     for q in quotes:
         ag = await db.agent_profiles.find_one({"agent_id": q["agent_id"]}, {"_id": 0})
         if user["role"] == "agent" and q["agent_user_id"] == user["user_id"] and q.get("status") == "won":
@@ -454,8 +458,23 @@ async def get_rfq(rfq_id: str, user: dict = Depends(get_current_user)):
             q["agent_user_id"] = "hidden"
             q["contact_number"] = ""
             q["message"] = ""  # hide pitch from competitors
+        elif is_buyer_owner and q.get("status") not in ("won", "confirmed", "packed", "dispatched", "delivered"):
+            # Buyer sees only "Verified <City> Manufacturer" until they accept the winning bid
+            city = (ag.get("factory_city") or ag.get("factory_state") or "").strip() if ag else ""
+            verified_label = "Verified " + (city + " " if city else "") + "Manufacturer"
+            q["agent"] = {
+                "company_name": verified_label,
+                "verified": ag.get("verified", False) if ag else False,
+                "badges": ag.get("badges", []) if ag else [],
+                "factory_city": city,
+            }
+            q["agent_user_id"] = "hidden"
+            q["contact_number"] = ""
         else:
             q["agent"] = ag
+            # Strip contact_number system-wide (per spec sheet: no phone visible to buyer ever pre-accept)
+            if user["role"] != "admin" and q.get("status") not in ("won", "confirmed", "packed", "dispatched", "delivered"):
+                q["contact_number"] = ""
     # Buyer name: visible to buyer-owner and admin always; visible to winning agent post-accept; otherwise anonymised
     show_buyer_name = is_buyer_owner or is_admin or is_winner
     if buyer and show_buyer_name:
@@ -1107,6 +1126,24 @@ async def admin_stats(user: dict = Depends(get_current_user)):
 
 
 # ---------- Buyer funnel: Niches & Blueprint ----------
+@api.get("/network/stats")
+async def network_stats():
+    """Aggregate counts per category — used on landing page Number Cards."""
+    pipeline = [
+        {"$unwind": "$categories"},
+        {"$group": {"_id": "$categories", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    rows = await db.agent_profiles.aggregate(pipeline).to_list(100)
+    total = await db.agent_profiles.count_documents({})
+    verified = await db.agent_profiles.count_documents({"verified": True})
+    return {
+        "total": total,
+        "verified": verified,
+        "by_category": [{"category": r["_id"], "count": r["count"]} for r in rows if r.get("_id")],
+    }
+
+
 @api.get("/niches")
 async def list_niches():
     return NICHES
@@ -1136,6 +1173,7 @@ async def update_buyer_profile(inp: BuyerProfileInput, user: dict = Depends(get_
             "niche_preference": inp.niche,
             "sub_category_preference": inp.sub_category,
             "business_model": inp.business_model,
+            "phone": inp.phone,
             "chat_answers": inp.chat_answers,
         }},
     )

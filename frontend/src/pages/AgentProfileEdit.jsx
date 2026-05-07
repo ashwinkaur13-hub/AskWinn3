@@ -5,7 +5,20 @@ import axios from "axios";
 import { toast } from "sonner";
 
 const CATEGORIES = ["Textile & Apparel", "Consumer Electronics", "Packaging", "Home Goods", "Beauty & Cosmetics", "Food & Beverage", "Hardware", "Toys & Games"];
-const REGIONS = ["China", "India", "Vietnam", "Turkey", "Mexico", "Portugal", "Italy", "USA"];
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Bihar", "Delhi", "Gujarat", "Haryana", "Karnataka", "Kerala",
+  "Madhya Pradesh", "Maharashtra", "Punjab", "Rajasthan", "Tamil Nadu", "Telangana",
+  "Uttar Pradesh", "West Bengal", "Other",
+];
+const YEARS_OPTIONS = ["0-2 Years", "3-5 Years", "6-10 Years", "10+ Years"];
+
+const yearsLabelToInt = (label) => ({ "0-2 Years": 1, "3-5 Years": 4, "6-10 Years": 8, "10+ Years": 12 }[label] || 0);
+const intToYearsLabel = (n) => {
+  if (!n || n < 3) return "0-2 Years";
+  if (n <= 5) return "3-5 Years";
+  if (n <= 10) return "6-10 Years";
+  return "10+ Years";
+};
 
 export default function AgentProfileEdit() {
   const { user } = useAuth();
@@ -17,7 +30,8 @@ export default function AgentProfileEdit() {
       setForm({
         company_name: d.company_name || "", tagline: d.tagline || "",
         bio: d.bio || "",
-        categories: d.categories || [], regions: d.regions || [],
+        categories: d.categories || [],
+        country: "India",
         services: (d.services || []).join(", "),
         certifications: (d.certifications || []).join(", "),
         portfolio_images: (d.portfolio_images || []).join("\n"),
@@ -28,10 +42,11 @@ export default function AgentProfileEdit() {
         business_address: d.business_address || "",
         factory_city: d.factory_city || "",
         factory_state: d.factory_state || "",
-        years_in_operation: d.years_in_operation || 0,
+        years_band: intToYearsLabel(d.years_in_operation),
         factory_video_url: d.factory_video_url || "",
         catalogue_url: d.catalogue_url || "",
         availability_status: d.availability_status || "active",
+        turnkey_manufacturing: d.turnkey_manufacturing ?? true,
       });
     });
   }, [user]);
@@ -42,13 +57,30 @@ export default function AgentProfileEdit() {
 
   const save = async (e) => {
     e.preventDefault();
+    if (!form.turnkey_manufacturing) {
+      toast.error("AskWinn is a Turnkey Manufacturing network — please confirm End-to-End Turnkey capability.");
+      return;
+    }
     const payload = {
-      ...form,
+      company_name: form.company_name,
+      tagline: form.tagline,
+      bio: form.bio,
+      categories: form.categories,
+      regions: ["India"],
       min_order_qty: Number(form.min_order_qty) || 0,
-      years_in_operation: Number(form.years_in_operation) || 0,
+      years_in_operation: yearsLabelToInt(form.years_band),
       services: form.services.split(",").map((s) => s.trim()).filter(Boolean),
       certifications: form.certifications.split(",").map((s) => s.trim()).filter(Boolean),
       portfolio_images: form.portfolio_images.split("\n").map((s) => s.trim()).filter(Boolean),
+      pan_number: form.pan_number,
+      gst_number: form.gst_number,
+      business_address: form.business_address,
+      factory_city: form.factory_city,
+      factory_state: form.factory_state,
+      factory_video_url: form.factory_video_url,
+      catalogue_url: form.catalogue_url,
+      availability_status: form.availability_status,
+      turnkey_manufacturing: !!form.turnkey_manufacturing,
     };
     try {
       await axios.put(`${API}/agents/me`, payload);
@@ -75,8 +107,24 @@ export default function AgentProfileEdit() {
             <F label="Tagline (one line)">
               <input className="input-underline" value={form.tagline} onChange={(e) => setForm({ ...form, tagline: e.target.value })} data-testid="profile-tagline" />
             </F>
-            <F label="Bio">
-              <textarea className="input-underline min-h-[120px]" value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} data-testid="profile-bio" />
+            <F label="Core Manufacturing Capabilities">
+              <textarea className="input-underline min-h-[120px]" value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} placeholder="What can your factory build end-to-end? Capacity, machinery, IP, processes…" data-testid="profile-bio" />
+            </F>
+            <F label="">
+              <label className="flex items-start gap-3 p-4 border border-klein bg-klein/5 cursor-pointer" data-testid="profile-turnkey-wrap">
+                <input
+                  type="checkbox"
+                  required
+                  checked={!!form.turnkey_manufacturing}
+                  onChange={(e) => setForm({ ...form, turnkey_manufacturing: e.target.checked })}
+                  className="mt-1"
+                  data-testid="profile-turnkey"
+                />
+                <div>
+                  <div className="font-serif text-lg leading-tight">End-to-End Turnkey Manufacturing</div>
+                  <p className="text-xs text-[--muted-foreground] mt-1">AskWinn is a Turnkey network — confirm you can take an RFQ from raw material to dispatched goods without sub-contracting outside your control.</p>
+                </div>
+              </label>
             </F>
             <F label="Availability">
               <select className="input-underline" value={form.availability_status} onChange={(e) => setForm({ ...form, availability_status: e.target.value })} data-testid="profile-availability">
@@ -99,16 +147,24 @@ export default function AgentProfileEdit() {
               <textarea className="input-underline min-h-[80px]" value={form.business_address} onChange={(e) => setForm({ ...form, business_address: e.target.value })} data-testid="profile-address" />
             </F>
             <div className="grid md:grid-cols-3 gap-6">
+              <F label="Country">
+                <input disabled className="input-underline opacity-60" value="India" data-testid="profile-country" />
+              </F>
+              <F label="State">
+                <select className="input-underline" value={form.factory_state} onChange={(e) => setForm({ ...form, factory_state: e.target.value })} data-testid="profile-state">
+                  <option value="">— select state —</option>
+                  {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </F>
               <F label="Factory city">
-                <input className="input-underline" value={form.factory_city} onChange={(e) => setForm({ ...form, factory_city: e.target.value })} data-testid="profile-city" />
-              </F>
-              <F label="Factory state">
-                <input className="input-underline" value={form.factory_state} onChange={(e) => setForm({ ...form, factory_state: e.target.value })} data-testid="profile-state" />
-              </F>
-              <F label="Years in operation">
-                <input type="number" min="0" className="input-underline" value={form.years_in_operation} onChange={(e) => setForm({ ...form, years_in_operation: e.target.value })} data-testid="profile-years" />
+                <input className="input-underline" value={form.factory_city} onChange={(e) => setForm({ ...form, factory_city: e.target.value })} placeholder="e.g. Jaipur" data-testid="profile-city" />
               </F>
             </div>
+            <F label="Years in operation">
+              <select className="input-underline" value={form.years_band} onChange={(e) => setForm({ ...form, years_band: e.target.value })} data-testid="profile-years">
+                {YEARS_OPTIONS.map((y) => <option key={y}>{y}</option>)}
+              </select>
+            </F>
             <F label="Factory tour video URL (YouTube / Vimeo)">
               <input type="url" className="input-underline" value={form.factory_video_url} onChange={(e) => setForm({ ...form, factory_video_url: e.target.value })} placeholder="https://youtu.be/..." data-testid="profile-video" />
             </F>
@@ -125,13 +181,6 @@ export default function AgentProfileEdit() {
               <div className="flex flex-wrap gap-2">
                 {CATEGORIES.map((c) => (
                   <button type="button" key={c} onClick={() => toggle("categories", c)} className={`tag ${form.categories.includes(c) ? "verified" : ""} cursor-pointer`}>{c}</button>
-                ))}
-              </div>
-            </F>
-            <F label="Regions">
-              <div className="flex flex-wrap gap-2">
-                {REGIONS.map((c) => (
-                  <button type="button" key={c} onClick={() => toggle("regions", c)} className={`tag ${form.regions.includes(c) ? "verified" : ""} cursor-pointer`}>{c}</button>
                 ))}
               </div>
             </F>

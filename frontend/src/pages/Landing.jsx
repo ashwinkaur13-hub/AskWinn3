@@ -17,10 +17,12 @@ const CATEGORIES = [
 
 export default function Landing() {
   const [featured, setFeatured] = useState([]);
+  const [networkStats, setNetworkStats] = useState(null);
   const nav = useNavigate();
 
   useEffect(() => {
     axios.get(`${API}/agents?verified=true`).then((r) => setFeatured(r.data.slice(0, 3))).catch(() => {});
+    axios.get(`${API}/network/stats`).then((r) => setNetworkStats(r.data)).catch(() => {});
   }, []);
 
   const startLogin = (role) => {
@@ -44,26 +46,26 @@ export default function Landing() {
         <div className="max-w-[1400px] mx-auto px-6 lg:px-10 pt-16 pb-24 grid lg:grid-cols-12 gap-10">
           <div className="lg:col-span-7 flex flex-col justify-center reveal">
             <h1 className="font-serif text-[3.4rem] sm:text-[5rem] lg:text-[7rem] font-light leading-[0.92] tracking-[-0.04em]">
-              Ship the <em className="text-klein not-italic">idea</em>,<br />
-              not the <span className="relative">headache<span className="absolute -bottom-1 left-0 right-0 h-1 bg-burn"></span></span>.
+              Don't search for <em className="text-klein not-italic">manufacturers</em>.<br />
+              Make them <span className="relative">bid<span className="absolute -bottom-1 left-0 right-0 h-1 bg-burn"></span></span> for your brand.
             </h1>
             <p className="mt-10 max-w-xl text-lg leading-relaxed text-[--muted-foreground]">
-              AskWinn is the curated marketplace of end-to-end manufacturing agents for founders who'd rather build the product than manage the pipeline.
+              AskWinn is the closed bidding engine where verified Indian manufacturers compete for your order. You set the brief — they bring the bids.
             </p>
             <div className="mt-12 flex flex-wrap gap-4">
               <button onClick={startBuyerFunnel} className="btn-primary" data-testid="hero-buyer-btn">
-                <Briefcase className="w-4 h-4" /> I'm a buyer — start guided
+                <Briefcase className="w-4 h-4" /> Start your brief
               </button>
               <button onClick={() => startLogin("agent")} className="btn-accent" data-testid="hero-agent-btn">
-                <Factory className="w-4 h-4" /> I'm a service provider
+                <Factory className="w-4 h-4" /> Manufacturer sign in
               </button>
-              <Link to="/directory" className="btn-outline" data-testid="hero-browse-btn">
-                Browse agents
-              </Link>
+              <a href="mailto:experts@askwinn.in?subject=I'd%20like%20to%20talk%20to%20an%20AskWinn%20expert" className="btn-outline" data-testid="hero-expert-btn">
+                <MessageSquare className="w-4 h-4" /> Talk to an expert
+              </a>
             </div>
             <div className="mt-16 grid grid-cols-3 gap-6 max-w-xl">
-              <Stat n="240+" l="Verified agents" />
-              <Stat n="38" l="Countries" />
+              <Stat n="240+" l="Verified manufacturers" />
+              <Stat n="38" l="Cities" />
               <Stat n="$12M" l="RFQs matched" />
             </div>
           </div>
@@ -129,50 +131,56 @@ export default function Landing() {
         <div className="max-w-[1400px] mx-auto px-6 lg:px-10 py-28">
           <div className="flex items-end justify-between mb-12 flex-wrap gap-6">
             <div>
-              <div className="overline mb-4 text-burn">§ 02 — Categories</div>
+              <div className="overline mb-4 text-burn">§ 02 — Industries we cover</div>
               <h2 className="font-serif text-5xl lg:text-6xl font-light leading-none tracking-tight">What do you<br /><em>actually</em> need to ship?</h2>
             </div>
-            <Link to="/directory" className="btn-accent">Explore all <ArrowUpRight className="w-4 h-4" /></Link>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/10">
             {CATEGORIES.map((c, i) => (
-              <Link
+              <button
                 key={c}
-                to={`/directory?category=${encodeURIComponent(c)}`}
-                className="bg-ink hover:bg-klein p-8 transition-colors group"
+                onClick={startBuyerFunnel}
+                className="bg-ink hover:bg-klein p-8 transition-colors group text-left"
                 data-testid={`cat-${c.replace(/\s+/g, "-").toLowerCase()}`}
               >
                 <div className="font-mono text-xs opacity-50 mb-8">{String(i + 1).padStart(2, "0")}</div>
                 <div className="font-serif text-2xl leading-tight group-hover:translate-x-1 transition-transform">{c}</div>
                 <ArrowUpRight className="w-4 h-4 mt-6 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </Link>
+              </button>
             ))}
           </div>
         </div>
       </section>
 
-      {/* FEATURED */}
-      {featured.length > 0 && (
-        <section className="max-w-[1400px] mx-auto px-6 lg:px-10 py-28">
-          <div className="mb-12">
-            <div className="overline mb-4">§ 03 — Featured</div>
-            <h2 className="font-serif text-5xl lg:text-6xl font-light leading-none tracking-tight">Hand-picked agents.</h2>
+      {/* NETWORK NUMBER CARDS */}
+      <section className="max-w-[1400px] mx-auto px-6 lg:px-10 py-28">
+        <div className="grid lg:grid-cols-12 gap-10 mb-12">
+          <div className="lg:col-span-7">
+            <div className="overline mb-4">§ 03 — Network</div>
+            <h2 className="font-serif text-5xl lg:text-6xl font-light leading-none tracking-tight">
+              Verified manufacturers,<br /><em className="text-klein not-italic">on tap</em>.
+            </h2>
           </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {featured.map((a, i) => (
-              <Link key={a.agent_id} to={`/agents/${a.agent_id}`} className="editorial-card p-8 block" data-testid={`featured-${a.agent_id}`}>
-                <div className="overline mb-4">Nº{String(i + 1).padStart(2, "0")}</div>
-                <h3 className="font-serif text-3xl tracking-tight leading-tight mb-3">{a.company_name}</h3>
-                <p className="text-sm text-[--muted-foreground] mb-6">{a.tagline}</p>
-                <div className="hairline pt-4 flex justify-between font-mono text-xs text-[--muted-foreground]">
-                  <span>{(a.regions || []).join(", ") || "Global"}</span>
-                  <span>★ {(a.rating || 0).toFixed(1)}</span>
-                </div>
-              </Link>
+          <div className="lg:col-span-4 lg:col-start-9 text-base text-[--muted-foreground] leading-relaxed self-end">
+            Our closed network is what makes bids competitive. Every manufacturer is verified — factory walkthrough, audits, references on file.
+          </div>
+        </div>
+
+        {networkStats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {networkStats.by_category.map((row, i) => (
+              <div key={row.category} className="editorial-card p-7" data-testid={`network-card-${row.category.replace(/\s+/g, "-").toLowerCase()}`}>
+                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[--muted-foreground] mb-4">Nº{String(i + 1).padStart(2, "0")}</div>
+                <div className="font-serif text-6xl tracking-tight leading-none">{row.count}<span className="text-2xl text-klein ml-1">+</span></div>
+                <div className="overline mt-3 text-[10px]">{row.category} manufacturers</div>
+              </div>
             ))}
+            {networkStats.by_category.length === 0 && (
+              <div className="col-span-full text-sm text-[--muted-foreground] font-mono">— Network warming up. Be the first brief.</div>
+            )}
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       {/* TRUST */}
       <section className="max-w-[1400px] mx-auto px-6 lg:px-10 py-28 grid lg:grid-cols-12 gap-10 items-center">

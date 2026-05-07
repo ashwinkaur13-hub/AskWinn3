@@ -5,11 +5,22 @@ import { API, useAuth } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 import { Sparkles, ArrowRight, Lock } from "lucide-react";
 
+const NICHE_PRODUCT_EXAMPLES = {
+  jewellery: "A handcrafted silver pendant collection for Diwali gifting",
+  apparel: "A capsule of heavyweight oversized tees for streetwear",
+  beauty: "A vitamin-C niacinamide serum for sensitive skin",
+  "home-decor": "Soy-wax candles in handmade ceramic vessels",
+  electronics: "Bluetooth earbuds with active noise cancellation",
+  packaging: "Eco-kraft mailers for a beauty D2C brand",
+  food: "Single-origin millet snack bars",
+  toys: "A wooden Montessori activity board for toddlers",
+};
+
 const QUESTIONS = [
   {
     key: "product_idea",
-    bot: (n) => `Awesome — ${n} is a great space. What product are you imagining?`,
-    placeholder: "e.g. A handcrafted silver pendant collection for Diwali gifting",
+    bot: () => "Excellent choice. Let's define your execution strategy. What specific product category are we building?",
+    placeholderFn: (key) => `e.g. ${NICHE_PRODUCT_EXAMPLES[key] || "describe the product you want to build"}`,
     type: "text",
   },
   {
@@ -144,7 +155,7 @@ export default function StartChat() {
                   <input
                     autoFocus
                     className="input-underline flex-1"
-                    placeholder={current?.placeholder || "Type your answer…"}
+                    placeholder={current?.placeholderFn ? current.placeholderFn(niche) : (current?.placeholder || "Type your answer…")}
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     data-testid="chat-input"

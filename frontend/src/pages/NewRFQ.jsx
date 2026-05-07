@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import axios from "axios";
 import { API } from "@/context/AuthContext";
@@ -7,14 +7,30 @@ import { toast } from "sonner";
 import { Upload, X, FileText, ArrowRight } from "lucide-react";
 
 const CATEGORIES = ["Textile & Apparel", "Consumer Electronics", "Packaging", "Home Goods", "Beauty & Cosmetics", "Food & Beverage", "Hardware", "Toys & Games"];
-const REGIONS = ["Any", "China", "India", "Vietnam", "Turkey", "Mexico", "Portugal", "Italy", "USA"];
+const REGIONS = ["Any", "India", "China", "Vietnam", "Turkey", "Mexico", "Portugal", "Italy", "USA"];
+
+const BUDGET_FROM_RANGE = {
+  "Under ₹1 L": 80000, "₹1–5 L": 300000, "₹5–15 L": 1000000, "₹15–50 L": 3000000, "₹50 L+": 7500000,
+};
 
 export default function NewRFQ() {
   const nav = useNavigate();
+  const [params] = useSearchParams();
+  const initialCategory = params.get("category") || CATEGORIES[0];
+  let answers = {};
+  try { answers = JSON.parse(sessionStorage.getItem("askwinn_funnel_answers") || "{}"); } catch {}
+  const prefillBudget = BUDGET_FROM_RANGE[answers.budget_range] || 50000;
+  const prefillTimeline = answers.timeline || "8 weeks";
+
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
-    title: "", description: "", category: CATEGORIES[0], target_region: "Any",
-    quantity: 100, budget_usd: 5000, timeline: "8 weeks",
+    title: "",
+    description: answers.product_idea || "",
+    category: initialCategory,
+    target_region: "India",
+    quantity: 100,
+    budget_usd: prefillBudget, // stored field name kept; UI labels as ₹
+    timeline: prefillTimeline,
   });
   const [requirements, setRequirements] = useState({});
   const [schema, setSchema] = useState(null);
@@ -121,7 +137,7 @@ export default function NewRFQ() {
               <Field label="Quantity">
                 <input type="number" min="1" required className="input-underline" value={form.quantity} onChange={(e) => set("quantity", e.target.value)} data-testid="rfq-qty" />
               </Field>
-              <Field label="Budget (USD)">
+              <Field label="Budget (₹ INR)">
                 <input type="number" min="0" required className="input-underline" value={form.budget_usd} onChange={(e) => set("budget_usd", e.target.value)} data-testid="rfq-budget" />
               </Field>
               <Field label="Timeline" className="md:col-span-2">

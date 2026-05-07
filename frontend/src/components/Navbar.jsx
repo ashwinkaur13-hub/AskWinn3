@@ -17,11 +17,12 @@ export default function Navbar({ transparent = false }) {
           <span className="font-serif text-3xl font-medium tracking-tighter leading-none">Ask<span className="text-klein">Winn</span>.</span>
         </Link>
         <nav className="hidden md:flex items-center gap-10 text-[13px] font-medium">
-          <Link to="/directory" className="hover:text-klein transition-colors" data-testid="nav-directory">Agents</Link>
+          {user?.role === "buyer" && <Link to="/start" className="hover:text-klein transition-colors" data-testid="nav-start">Post a brief</Link>}
           {user?.role === "buyer" && <Link to="/favourites" className="hover:text-klein transition-colors" data-testid="nav-favourites">Saved</Link>}
           {user && <Link to="/rfqs" className="hover:text-klein transition-colors" data-testid="nav-rfqs">RFQs</Link>}
           {user && <Link to="/messages" className="hover:text-klein transition-colors" data-testid="nav-messages">Messages</Link>}
           {user?.role === "admin" && <Link to="/admin" className="hover:text-klein transition-colors flex items-center gap-1" data-testid="nav-admin"><Shield className="w-3.5 h-3.5" />Admin</Link>}
+          <a href="mailto:experts@askwinn.in?subject=I'd%20like%20to%20talk%20to%20an%20AskWinn%20expert" className="hover:text-klein transition-colors" data-testid="nav-expert">Talk to an expert</a>
         </nav>
         <div className="flex items-center gap-3">
           {!user ? (

@@ -77,10 +77,9 @@ export default function StartNiche() {
         </div>
 
         <div className="mt-16 text-center">
-          <p className="text-sm text-[--muted-foreground] mb-3">Already know what you need?</p>
-          <Link to="/directory" className="font-mono text-xs underline" data-testid="skip-to-directory">
-            SKIP — BROWSE THE AGENT DIRECTORY →
-          </Link>
+          <p className="text-sm text-[--muted-foreground]">
+            Don't see your category? <a href="mailto:experts@askwinn.in?subject=Custom%20brief%20-%20outside%20listed%20niches" className="underline" data-testid="other-niche-expert-link">Talk to an expert →</a>
+          </p>
         </div>
       </div>
       <Footer />
